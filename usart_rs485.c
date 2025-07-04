@@ -55,6 +55,116 @@ void rs485_init(void)
 }
 
 /**
+ * @brief  发送数据缓冲区
+ * @param  data: 数据缓冲区指针
+ * @param  len: 数据长度
+ * @retval None
+ */
+void rs485_send_buffer(uint8_t* data, uint16_t len)
+{
+    rs485_set_mode(RS485_MODE_TX);
+    
+    for(uint16_t i = 0; i < len; i++)
+    {
+        /* 等待发送缓冲区空 */
+        while(usart_flag_get(RS485_USART, USART_TDC_FLAG) == RESET);
+        
+        /* 发送数据 */
+        usart_data_transmit(RS485_USART, data[i]);
+    }
+    
+    /* 等待发送完成 */
+    while(usart_flag_get(RS485_USART, USART_TDC_FLAG) == RESET);
+    
+    rs485_set_mode(RS485_MODE_RX);
+}
+
+/**
+ * @brief  接收数据
+ * @param  data: 数据缓冲区指针
+ * @param  max_len: 最大接收长度
+ * @retval 实际接收长度
+ */
+uint16_t rs485_receive_data(uint8_t* data, uint16_t max_len)
+{
+    uint16_t len = 0;
+    
+    if(rs485_rx_flag)
+    {
+        len = (rs485_rx_count < max_len) ? rs485_rx_count : max_len;
+        
+        for(uint16_t i = 0; i < len; i++)
+        {
+            data[i] = rs485_rx_buffer[i];
+        }
+        
+        /* 清空接收缓冲区 */
+        rs485_rx_count = 0;
+        rs485_rx_flag = 0;
+    }
+    
+    return len;
+}
+
+/**
+ * @brief  检查是否有数据接收
+ * @param  None
+ * @retval 1: 有数据, 0: 无数据
+ */
+uint8_t rs485_data_available(void)
+{
+    return rs485_rx_flag;
+}
+
+/**
+ * @brief  获取接收数据长度
+ * @param  None
+ * @retval 接收数据长度
+ */
+uint16_t rs485_get_rx_length(void)
+{
+    return rs485_rx_count;
+}
+
+/**
+ * @brief  清空接收缓冲区
+ * @param  None
+ * @retval None
+ */
+void rs485_clear_rx_buffer(void)
+{
+    rs485_rx_count = 0;
+    rs485_rx_flag = 0;
+}
+
+/**
+ * @brief  USART2中断服务函数
+ * @param  None
+ * @retval None
+ */
+void RS485_USART_IRQHandler(void)
+{
+    if(usart_interrupt_flag_get(RS485_USART, USART_RDBF_INT) != RESET)
+    {
+        /* 读取接收数据 */
+        uint8_t data = usart_data_receive(RS485_USART);
+        
+        /* 存储到接收缓冲区 */
+        if(rs485_rx_count < RS485_RX_BUFFER_SIZE)
+        {
+            rs485_rx_buffer[rs485_rx_count++] = data;
+        }
+        
+        /* 设置接收标志 */
+        rs485_rx_flag = 1;
+        
+        /* 清除中断标志 */
+        usart_flag_clear(RS485_USART, USART_RDBF_FLAG);
+    }
+}
+}
+
+/**
  * @brief  设置RS485工作模式
  * @param  mode: RS485_MODE_TX 或 RS485_MODE_RX
  * @retval None
