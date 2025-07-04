@@ -1,7 +1,7 @@
 /**
  * @file usart_rs485.c
  * @brief RS485通信模块实现
- * @author Your Name
+ * @author Jason
  * @date 2025-07-04
  */
 
@@ -21,6 +21,26 @@ static uint8_t rs485_rx_flag = 0;
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
+
+/**
+ * @brief  设置RS485工作模式
+ * @param  mode: RS485_MODE_TX 或 RS485_MODE_RX
+ * @retval None
+ */
+void rs485_set_mode(rs485_mode_t mode)
+{
+    if(mode == RS485_MODE_TX)
+    {
+        gpio_bits_set(RS485_DE_GPIO_PORT, RS485_DE_GPIO_PIN);
+    }
+    else
+    {
+        gpio_bits_reset(RS485_DE_GPIO_PORT, RS485_DE_GPIO_PIN);
+    }
+    
+    /* 模式切换延时 */
+    delay_us(10);
+}
 
 /**
  * @brief  RS485初始化
@@ -51,6 +71,51 @@ void rs485_init(void)
     usart_enable(RS485_USART, TRUE);
     
     /* 设置RS485为接收模式 */
+    rs485_set_mode(RS485_MODE_RX);
+}
+
+/**
+ * @brief  发送单个字节
+ * @param  data: 要发送的字节
+ * @retval None
+ */
+void rs485_send_byte(uint8_t data)
+{
+    rs485_set_mode(RS485_MODE_TX);
+    
+    /* 等待发送缓冲区空 */
+    while(usart_flag_get(RS485_USART, USART_TDC_FLAG) == RESET);
+    
+    /* 发送数据 */
+    usart_data_transmit(RS485_USART, data);
+    
+    /* 等待发送完成 */
+    while(usart_flag_get(RS485_USART, USART_TDC_FLAG) == RESET);
+    
+    rs485_set_mode(RS485_MODE_RX);
+}
+
+/**
+ * @brief  发送字符串
+ * @param  str: 要发送的字符串
+ * @retval None
+ */
+void rs485_send_string(const char* str)
+{
+    rs485_set_mode(RS485_MODE_TX);
+    
+    while(*str)
+    {
+        /* 等待发送缓冲区空 */
+        while(usart_flag_get(RS485_USART, USART_TDC_FLAG) == RESET);
+        
+        /* 发送数据 */
+        usart_data_transmit(RS485_USART, *str++);
+    }
+    
+    /* 等待发送完成 */
+    while(usart_flag_get(RS485_USART, USART_TDC_FLAG) == RESET);
+    
     rs485_set_mode(RS485_MODE_RX);
 }
 
@@ -162,68 +227,3 @@ void RS485_USART_IRQHandler(void)
         usart_flag_clear(RS485_USART, USART_RDBF_FLAG);
     }
 }
-}
-
-/**
- * @brief  设置RS485工作模式
- * @param  mode: RS485_MODE_TX 或 RS485_MODE_RX
- * @retval None
- */
-void rs485_set_mode(rs485_mode_t mode)
-{
-    if(mode == RS485_MODE_TX)
-    {
-        gpio_bits_set(RS485_DE_GPIO_PORT, RS485_DE_GPIO_PIN);
-    }
-    else
-    {
-        gpio_bits_reset(RS485_DE_GPIO_PORT, RS485_DE_GPIO_PIN);
-    }
-    
-    /* 模式切换延时 */
-    delay_us(10);
-}
-
-/**
- * @brief  发送单个字节
- * @param  data: 要发送的字节
- * @retval None
- */
-void rs485_send_byte(uint8_t data)
-{
-    rs485_set_mode(RS485_MODE_TX);
-    
-    /* 等待发送缓冲区空 */
-    while(usart_flag_get(RS485_USART, USART_TDC_FLAG) == RESET);
-    
-    /* 发送数据 */
-    usart_data_transmit(RS485_USART, data);
-    
-    /* 等待发送完成 */
-    while(usart_flag_get(RS485_USART, USART_TDC_FLAG) == RESET);
-    
-    rs485_set_mode(RS485_MODE_RX);
-}
-
-/**
- * @brief  发送字符串
- * @param  str: 要发送的字符串
- * @retval None
- */
-void rs485_send_string(const char* str)
-{
-    rs485_set_mode(RS485_MODE_TX);
-    
-    while(*str)
-    {
-        /* 等待发送缓冲区空 */
-        while(usart_flag_get(RS485_USART, USART_TDC_FLAG) == RESET);
-        
-        /* 发送数据 */
-        usart_data_transmit(RS485_USART, *str++);
-    }
-    
-    /* 等待发送完成 */
-    while(usart_flag_get(RS485_USART, USART_TDC_FLAG) == RESET);
-    
-    rs485_set_mode(RS485_MODE_RX);
